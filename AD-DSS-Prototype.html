@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AD-DSS · Academic Deployment Decision-Support System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root {
+  --bg: #0f0f0f;
+  --surface: #171717;
+  --card: #1e1e1e;
+  --border: #2a2a2a;
+  --accent: #b5e853;
+  --accent-dim: #7aad2a;
+  --text: #e8e8e8;
+  --muted: #888;
+  --danger: #e85353;
+  --warn: #e8a953;
+  --cloud: #53b8e8;
+  --local: #b5e853;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* HEADER */
+.app-header {
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(15,15,15,0.95);
+  backdrop-filter: blur(12px);
+}
+.app-title { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
+.app-sub { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; }
+.dot { color: var(--border); margin: 0 4px; }
+
+/* STEPPER */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 24px 40px 0;
+  overflow-x: auto;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 0;
+  white-space: nowrap;
+}
+.step-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.step-label { font-size: 0.82rem; color: var(--muted); transition: color 0.2s; }
+.step-connector {
+  flex: 1; height: 1px;
+  background: var(--border);
+  margin: 0 12px;
+  min-width: 30px;
+}
+.step-item.active .step-num { background: var(--accent); border-color: var(--accent); color: #000; }
+.step-item.active .step-label { color: var(--text); font-weight: 600; }
+.step-item.done .step-num { background: transparent; border-color: var(--accent-dim); color: var(--accent); }
+.step-item.done .step-label { color: var(--accent-dim); }
+
+/* MAIN */
+main { max-width: 900px; margin: 0 auto; padding: 32px 40px 80px; }
+
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+/* CARDS */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+.card:hover { border-color: #3a3a3a; }
+.card-title { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+.card-desc { color: var(--muted); font-size: 0.83rem; margin-bottom: 16px; }
+
+/* INPUTS */
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 0.82rem; color: var(--muted); }
+.field select, .field input[type="text"] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 11px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.field select:focus, .field input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+}
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: '⌄';
+  position: absolute; right: 12px; top: 50%; transform: translateY(-55%);
+  color: var(--muted); pointer-events: none; font-size: 1rem;
+}
+.field-hint { font-size: 0.74rem; color: var(--accent-dim); font-style: italic; }
+
+/* SLIDER */
+.slider-row { margin-top: 4px; }
+.slider-labels { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.slider-labels span { font-size: 0.75rem; color: var(--muted); }
+.slider-labels .val {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+/* NAV BUTTONS */
+.nav-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.btn {
+  padding: 11px 26px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  display: flex; align-items: center; gap: 8px;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-ghost:hover { border-color: #555; background: #1a1a1a; }
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+.btn-primary:hover { background: #cdf57a; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(181,232,83,0.3); }
+.btn-danger { background: var(--danger); color: #fff; }
+.step-info { font-size: 0.78rem; color: var(--muted); }
+
+/* PAGES */
+.page { display: none; animation: fadeIn 0.3s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ========================= RESULTS PAGE ========================= */
+.verdict-banner {
+  border-radius: 12px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.verdict-cloud { background: linear-gradient(135deg, #0d2233 0%, #0f1f30 100%); border: 1px solid #1e4a6a; }
+.verdict-local { background: linear-gradient(135deg, #1a2a0d 0%, #162210 100%); border: 1px solid #3a5a1a; }
+.verdict-hybrid { background: linear-gradient(135deg, #2a1a0d 0%, #231610 100%); border: 1px solid #5a3a1a; }
+.verdict-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.verdict-title {
+  font-family: 'Fraunces', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+.verdict-sub { font-size: 0.9rem; color: #aaa; max-width: 580px; line-height: 1.5; }
+.verdict-score-badge {
+  position: absolute; right: 32px; top: 32px;
+  font-family: 'Fraunces', serif;
+  font-size: 3rem;
+  font-weight: 700;
+  opacity: 0.18;
+}
+
+/* COMPARISON TABLE */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.compare-cell {
+  background: var(--card);
+  padding: 14px 16px;
+  font-size: 0.85rem;
+}
+.compare-header {
+  background: var(--surface);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.compare-label { color: var(--muted); font-size: 0.82rem; }
+.compare-cloud { color: var(--cloud); font-weight: 500; }
+.compare-local { color: var(--local); font-weight: 500; }
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: 'DM Mono', monospace;
+}
+.tag-good { background: rgba(181,232,83,0.15); color: var(--local); }
+.tag-warn { background: rgba(232,169,83,0.15); color: var(--warn); }
+.tag-bad { background: rgba(232,83,83,0.15); color: var(--danger); }
+.tag-neutral { background: rgba(83,184,232,0.15); color: var(--cloud); }
+
+/* RISK PROFILE */
+.risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+.risk-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.risk-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.risk-name { font-size: 0.85rem; font-weight: 500; }
+.risk-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.risk-bar { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+
+/* FEASIBILITY */
+.feasibility-row { display: flex; gap: 10px; margin-bottom: 24px; }
+.feasibility-card {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.feasibility-score {
+  font-family: 'Fraunces', serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.feasibility-label { font-size: 0.75rem; color: var(--muted); }
+.feasibility-type { font-size: 0.8rem; font-weight: 600; margin-bottom: 8px; }
+
+/* CHART */
+.chart-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.chart-title { font-weight: 600; margin-bottom: 4px; }
+.chart-sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 20px; }
+.chart-canvas { max-height: 280px; }
+
+/* EXPORT BTN */
+.export-bar { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+.btn-export {
+  background: transparent;
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  padding: 10px 20px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  transition: all 0.2s;
+}
+.btn-export:hover { background: rgba(181,232,83,0.08); transform: translateY(-1px); }
+.btn-export svg { width: 15px; height: 15px; }
+
+/* LOADING OVERLAY */
+#pdf-loading {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+}
+#pdf-loading.show { display: flex; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#pdf-loading p { color: var(--muted); font-size: 0.88rem; }
+
+/* SCORE RING */
+.score-ring-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+.score-ring {
+  position: relative;
+  width: 100px; height: 100px;
+}
+.score-ring svg { transform: rotate(-90deg); }
+.score-ring-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+/* RESPONSIVE */
+@media (max-width: 640px) {
+  main { padding: 24px 20px 60px; }
+  .app-header { padding: 16px 20px; }
+  .stepper { padding: 16px 20px 0; }
+  .field-row { grid-template-columns: 1fr; }
+  .compare-grid { grid-template-columns: 1fr; }
+  .risk-grid { grid-template-columns: 1fr; }
+  .feasibility-row { flex-direction: column; }
+}
+
+/* INSTITUTION NAME FULL WIDTH */
+.field-full { margin-bottom: 16px; }
+.field-full label { font-size: 0.82rem; color: var(--muted); display: block; margin-bottom: 6px; }
+.field-full input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 11px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  transition: border-color 0.2s;
+}
+.field-full input:focus { outline: none; border-color: var(--accent-dim); }
+.field-full input::placeholder { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div id="pdf-loading">
+  <div class="spinner"></div>
+  <p>Generating PDF report…</p>
+</div>
+
+<header class="app-header">
+  <span class="app-title">Academic Deployment Decision-Support System</span>
+  <span class="app-sub">AD-DSS Prototype v1.0 <span class="dot">·</span> University of San Jose-Recoletos</span>
+</header>
+
+<div class="stepper" id="stepper">
+  <div class="step-item active" data-step="1">
+    <div class="step-num">1</div>
+    <span class="step-label">Profile</span>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" data-step="2">
+    <div class="step-num">2</div>
+    <span class="step-label">Infrastructure</span>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" data-step="3">
+    <div class="step-num">3</div>
+    <span class="step-label">Financial</span>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" data-step="4">
+    <div class="step-num">4</div>
+    <span class="step-label">Priorities</span>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item" data-step="5">
+    <div class="step-num">5</div>
+    <span class="step-label">Results</span>
+  </div>
+</div>
+
+<main>
+
+<!-- ===== STEP 1: PROFILE ===== -->
+<div class="page active" id="page-1">
+  <div class="section-label">Institutional Profile</div>
+
+  <div class="field-full">
+    <label>Institution name</label>
+    <input type="text" id="inst-name" placeholder="e.g. Cebu Institute of Technology"/>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label>Student population</label>
+      <div class="select-wrap">
+        <select id="student-pop">
+          <option value="1">Under 1,000</option>
+          <option value="2" selected>1,000–5,000</option>
+          <option value="3">5,000–15,000</option>
+          <option value="4">Over 15,000</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Faculty and staff</label>
+      <div class="select-wrap">
+        <select id="faculty">
+          <option value="1">Under 50</option>
+          <option value="2" selected>50–200</option>
+          <option value="3">200–500</option>
+          <option value="4">Over 500</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label>IT department size</label>
+      <div class="select-wrap">
+        <select id="it-dept">
+          <option value="1">No dedicated IT</option>
+          <option value="2" selected>1–2 dedicated</option>
+          <option value="3">3–5 dedicated</option>
+          <option value="4">Full IT department (6+)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Institution type</label>
+      <div class="select-wrap">
+        <select id="inst-type">
+          <option value="private" selected>Private</option>
+          <option value="public">Public / SUC</option>
+          <option value="technical">Technical-Vocational</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <span class="step-info">Step 1 of 4</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div style="width:32px;height:3px;border-radius:2px;background:var(--accent)"></div>
+      <div style="width:32px;height:3px;border-radius:2px;background:var(--border)"></div>
+      <div style="width:32px;height:3px;border-radius:2px;background:var(--border)"></div>
+      <div style="width:32px;height:3px;border-radius:2px;background:var(--border)"></div>
+    </div>
+    <button class="btn btn-primary" onclick="goTo(2)">Next →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: INFRASTRUCTURE ===== -->
+<div class="page" id="page-2">
+  <div class="section-label">Infrastructure Reality</div>
+
+  <div class="card">
+    <div class="card-title">Average internet uptime on campus (%)</div>
+    <div class="slider-row">
+      <div class="slider-labels">
+        <span>40%</span>
+        <span class="val" id="uptime-val">75%</span>
+        <span>100%</span>
+      </div>
+      <input type="range" id="uptime" min="40" max="100" value="75" step="1"
+             oninput="document.getElementById('uptime-val').textContent=this.value+'%'"/>
+    </div>
+    <p class="field-hint" style="margin-top:10px;">Philippine provincial average: ~70–80%. Metro: ~85–95%.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Average internet speed (Mbps)</div>
+    <div class="slider-row">
+      <div class="slider-labels">
+        <span>1 Mbps</span>
+        <span class="val" id="speed-val">25 Mbps</span>
+        <span>500 Mbps</span>
+      </div>
+      <input type="range" id="speed" min="1" max="500" value="25" step="1"
+             oninput="document.getElementById('speed-val').textContent=this.value+' Mbps'"/>
+    </div>
+    <p class="field-hint" style="margin-top:10px;">Minimum recommended for cloud AIS: 25 Mbps per 500 concurrent users.</p>
+  </div>
+
+  <div class="field-row" style="margin-top:4px;">
+    <div class="field">
+      <label>Existing server hardware</label>
+      <div class="select-wrap">
+        <select id="server-hw">
+          <option value="1">None</option>
+          <option value="2">Outdated / unreliable</option>
+          <option value="3" selected>Partial / usable</option>
+          <option value="4">Modern and sufficient</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Power reliability</label>
+      <div class="select-wrap">
+        <select id="power">
+          <option value="1">Frequent outages (daily)</option>
+          <option value="2" selected>Occasional (weekly)</option>
+          <option value="3">Rare (monthly)</option>
+          <option value="4">Stable with UPS/genset</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+    <button class="btn btn-primary" onclick="goTo(3)">Next →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: FINANCIAL ===== -->
+<div class="page" id="page-3">
+  <div class="section-label">Financial Model</div>
+
+  <div class="field" style="margin-bottom:16px;">
+    <label>Available upfront budget — CAPEX (₱)</label>
+    <div class="select-wrap">
+      <select id="capex">
+        <option value="1">Under ₱300,000</option>
+        <option value="2">₱300,000–₱500,000</option>
+        <option value="3" selected>₱500,000–₱2,000,000</option>
+        <option value="4">₱2,000,000–₱5,000,000</option>
+        <option value="5">Over ₱5,000,000</option>
+      </select>
+    </div>
+    <p class="field-hint" style="margin-top:6px;">Local server setup typically requires ₱300K–₱1.5M upfront.</p>
+  </div>
+
+  <div class="field" style="margin-bottom:16px;">
+    <label>Monthly operational budget — OPEX (₱)</label>
+    <div class="select-wrap">
+      <select id="opex">
+        <option value="1">Under ₱5,000/mo</option>
+        <option value="2">₱5,000–₱20,000/mo</option>
+        <option value="3" selected>₱20,000–₱80,000/mo</option>
+        <option value="4">₱80,000–₱150,000/mo</option>
+        <option value="5">Over ₱150,000/mo</option>
+      </select>
+    </div>
+    <p class="field-hint" style="margin-top:6px;">Cloud AIS for mid-size schools: typically ₱15,000–₱60,000/month.</p>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label>Preferred cost model</label>
+      <div class="select-wrap">
+        <select id="cost-model">
+          <option value="subscription" selected>Recurring subscription</option>
+          <option value="onetime">One-time / perpetual license</option>
+          <option value="either">Either / flexible</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Budget review cycle</label>
+      <div class="select-wrap">
+        <select id="budget-cycle">
+          <option value="annual" selected>Annual</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="adhoc">Ad hoc / project-based</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+    <button class="btn btn-primary" onclick="goTo(4)">Next →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 4: PRIORITIES ===== -->
+<div class="page" id="page-4">
+  <div class="section-label">Data and Operational Priorities</div>
+
+  <div class="card">
+    <div class="card-title">Physical data governance</div>
+    <div class="card-desc">How important is keeping all data physically within your institution?</div>
+    <div class="slider-row">
+      <div class="slider-labels">
+        <span>Low</span>
+        <span class="val" id="gov-val">3</span>
+        <span>Critical</span>
+      </div>
+      <input type="range" id="data-gov" min="1" max="5" value="3" step="1"
+             oninput="document.getElementById('gov-val').textContent=this.value"/>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Remote accessibility</div>
+    <div class="card-desc">How important is accessing the system outside campus?</div>
+    <div class="slider-row">
+      <div class="slider-labels">
+        <span>Low</span>
+        <span class="val" id="remote-val">3</span>
+        <span>Critical</span>
+      </div>
+      <input type="range" id="remote-acc" min="1" max="5" value="3" step="1"
+             oninput="document.getElementById('remote-val').textContent=this.value"/>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">RA 10173 compliance strictness</div>
+    <div class="card-desc">How strictly must you comply with the Data Privacy Act?</div>
+    <div class="slider-row">
+      <div class="slider-labels">
+        <span>Basic</span>
+        <span class="val" id="ra-val">4</span>
+        <span>Strict</span>
+      </div>
+      <input type="range" id="ra-compliance" min="1" max="5" value="4" step="1"
+             oninput="document.getElementById('ra-val').textContent=this.value"/>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Scalability need (5-year growth)</div>
+    <div class="card-desc">How much do you expect student population to grow?</div>
+    <div class="slider-row">
+      <div class="slider-labels">
+        <span>Stable</span>
+        <span class="val" id="scale-val">3</span>
+        <span>Rapid</span>
+      </div>
+      <input type="range" id="scalability" min="1" max="5" value="3" step="1"
+             oninput="document.getElementById('scale-val').textContent=this.value"/>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
+    <button class="btn btn-primary" onclick="generateResults()">Generate Report →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 5: RESULTS ===== -->
+<div class="page" id="page-5">
+  <div id="results-content">
+
+    <!-- VERDICT -->
+    <div id="verdict-banner" class="verdict-banner"></div>
+
+    <!-- FEASIBILITY SCORES -->
+    <div class="section-label" style="margin-top:24px;">Feasibility Scores</div>
+    <div class="feasibility-row" id="feasibility-row"></div>
+
+    <!-- SIDE-BY-SIDE COMPARISON -->
+    <div class="section-label">Deployment Comparison</div>
+    <div class="compare-grid" id="compare-grid"></div>
+
+    <!-- RISK PROFILE -->
+    <div class="section-label" style="margin-top:24px;">Risk Assessment Profile</div>
+    <div class="risk-grid" id="risk-grid"></div>
+
+    <!-- 5-YEAR COST CHART -->
+    <div class="chart-wrap">
+      <div class="chart-title">5-Year Total Cost of Ownership Projection</div>
+      <div class="chart-sub">Cumulative cost comparison: Cloud subscription vs. Local server (hardware + maintenance)</div>
+      <canvas id="costChart" class="chart-canvas"></canvas>
+    </div>
+
+    <!-- RECOMMENDATION NOTES -->
+    <div class="card" id="rec-notes"></div>
+
+  </div>
+
+  <div class="export-bar">
+    <button class="btn-export" onclick="exportPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <polyline points="9 15 12 18 15 15"/>
+      </svg>
+      Export PDF Report
+    </button>
+    <button class="btn btn-ghost" onclick="goTo(1)" style="font-size:0.85rem;">Start Over</button>
+  </div>
+
+  <div class="nav-bar" style="border-top:none; padding-top:0; margin-top:0;">
+    <button class="btn btn-ghost" onclick="goTo(4)">← Back</button>
+    <span></span>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ===================== NAVIGATION =====================
+let currentStep = 1;
+let costChartInstance = null;
+
+function goTo(step) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + step).classList.add('active');
+
+  document.querySelectorAll('.step-item').forEach(item => {
+    const s = parseInt(item.dataset.step);
+    item.classList.remove('active', 'done');
+    if (s === step) item.classList.add('active');
+    else if (s < step) item.classList.add('done');
+  });
+
+  currentStep = step;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===================== ENGINE =====================
+function getInputs() {
+  return {
+    name: document.getElementById('inst-name').value || 'Your Institution',
+    studentPop: parseInt(document.getElementById('student-pop').value),
+    faculty: parseInt(document.getElementById('faculty').value),
+    itDept: parseInt(document.getElementById('it-dept').value),
+    instType: document.getElementById('inst-type').value,
+    uptime: parseInt(document.getElementById('uptime').value),
+    speed: parseInt(document.getElementById('speed').value),
+    serverHw: parseInt(document.getElementById('server-hw').value),
+    power: parseInt(document.getElementById('power').value),
+    capex: parseInt(document.getElementById('capex').value),
+    opex: parseInt(document.getElementById('opex').value),
+    costModel: document.getElementById('cost-model').value,
+    dataGov: parseInt(document.getElementById('data-gov').value),
+    remoteAcc: parseInt(document.getElementById('remote-acc').value),
+    raCompliance: parseInt(document.getElementById('ra-compliance').value),
+    scalability: parseInt(document.getElementById('scalability').value),
+  };
+}
+
+function computeScores(d) {
+  // Technical Feasibility (0–100)
+  let tech = 0;
+  tech += (d.uptime / 100) * 25;
+  tech += Math.min(d.speed / 100, 1) * 20;
+  tech += (d.serverHw / 4) * 20;
+  tech += (d.power / 4) * 20;
+  tech += (d.itDept / 4) * 15;
+
+  // Financial Feasibility (0–100)
+  let fin = 0;
+  fin += (d.capex / 5) * 40;
+  fin += (d.opex / 5) * 40;
+  fin += d.costModel === 'subscription' ? 10 : d.costModel === 'either' ? 15 : 20;
+
+  // Operational Feasibility (0–100)
+  let ops = 0;
+  ops += (d.itDept / 4) * 30;
+  ops += (d.power / 4) * 25;
+  ops += (d.serverHw / 4) * 25;
+  ops += ((d.studentPop <= 2 ? 1 : d.studentPop <= 3 ? 0.6 : 0.3)) * 20;
+
+  // Cloud Suitability Score (higher = cloud better)
+  let cloudScore = 0;
+  cloudScore += (d.uptime / 100) * 20;
+  cloudScore += Math.min(d.speed / 50, 1) * 20;
+  cloudScore += (d.remoteAcc / 5) * 15;
+  cloudScore += d.scalability >= 3 ? 15 : 5;
+  cloudScore += d.opex >= 3 ? 10 : 5;
+  cloudScore += d.costModel === 'subscription' ? 10 : 5;
+  cloudScore += d.itDept <= 2 ? 10 : 5;
+
+  // Local Suitability Score (higher = local better)
+  let localScore = 0;
+  localScore += (d.dataGov / 5) * 20;
+  localScore += (d.raCompliance / 5) * 15;
+  localScore += d.power >= 3 ? 15 : 5;
+  localScore += d.serverHw >= 3 ? 15 : 5;
+  localScore += d.capex >= 3 ? 15 : 5;
+  localScore += d.costModel === 'onetime' ? 10 : 5;
+  localScore += d.uptime < 75 ? 10 : 0;
+
+  // Normalize
+  const total = cloudScore + localScore;
+  const cloudPct = Math.round((cloudScore / total) * 100);
+  const localPct = 100 - cloudPct;
+
+  return {
+    technical: Math.round(tech),
+    financial: Math.round(fin),
+    operational: Math.round(ops),
+    cloudScore: cloudPct,
+    localScore: localPct,
+    verdict: cloudPct > localPct + 10 ? 'cloud' : localPct > cloudPct + 10 ? 'local' : 'hybrid',
+  };
+}
+
+function computeRisks(d) {
+  return [
+    {
+      name: 'Data Breach Risk',
+      cloud: d.dataGov >= 4 ? 65 : d.dataGov >= 2 ? 45 : 30,
+      local: d.raCompliance >= 4 ? 25 : 45,
+    },
+    {
+      name: 'Downtime Risk',
+      cloud: d.uptime < 70 ? 70 : d.uptime < 85 ? 50 : 25,
+      local: d.power <= 2 ? 65 : d.power === 3 ? 40 : 20,
+    },
+    {
+      name: 'Internet Dependency',
+      cloud: 85,
+      local: 15,
+    },
+    {
+      name: 'Vendor Lock-in',
+      cloud: d.costModel === 'subscription' ? 70 : 50,
+      local: 20,
+    },
+    {
+      name: 'Disaster Recovery',
+      cloud: 20,
+      local: d.serverHw >= 3 ? 40 : 70,
+    },
+  ];
+}
+
+function computeCosts(d) {
+  // Cloud costs (₱/year)
+  const cloudMonthly = [5000, 25000, 60000, 120000, 200000][d.opex - 1];
+  const cloudYearly = cloudMonthly * 12;
+
+  // Local costs
+  const localCapex = [200000, 400000, 1200000, 3000000, 6000000][d.capex - 1];
+  const localMaintenance = localCapex * 0.12; // 12% yearly maintenance
+  const localHwReplacement = localCapex * 0.3; // hardware refresh at year 3
+
+  const years = [1, 2, 3, 4, 5];
+  const cloudCumulative = years.map(y => cloudYearly * y);
+  const localCumulative = years.map(y => {
+    let cost = localCapex + localMaintenance * y;
+    if (y >= 3) cost += localHwReplacement * (y - 2) * 0.3;
+    return Math.round(cost);
+  });
+
+  return { cloudCumulative, localCumulative, cloudMonthly, localCapex };
+}
+
+// ===================== RENDER RESULTS =====================
+function generateResults() {
+  const d = getInputs();
+  const scores = computeScores(d);
+  const risks = computeRisks(d);
+  const costs = computeCosts(d);
+
+  // Verdict banner
+  const verdictEl = document.getElementById('verdict-banner');
+  const verdictConfig = {
+    cloud: {
+      cls: 'verdict-cloud',
+      label: 'Recommended Deployment',
+      title: 'Cloud-Based AIS',
+      color: '#53b8e8',
+      sub: `Based on your institution's connectivity profile, budget flexibility, and scalability requirements, a Cloud AIS deployment offers the highest feasibility and lowest total cost of ownership for ${d.name}.`
+    },
+    local: {
+      cls: 'verdict-local',
+      label: 'Recommended Deployment',
+      title: 'Local Server AIS',
+      color: '#b5e853',
+      sub: `Given your data governance priorities, existing infrastructure, and compliance requirements, an on-premise Local Server deployment is the most suitable AIS model for ${d.name}.`
+    },
+    hybrid: {
+      cls: 'verdict-hybrid',
+      label: 'Recommended Deployment',
+      title: 'Hybrid Deployment',
+      color: '#e8a953',
+      sub: `Your institution's profile shows balanced factors favoring neither pure cloud nor pure local. A Hybrid approach — local core with cloud backup/remote access — is recommended for ${d.name}.`
+    },
+  };
+  const vc = verdictConfig[scores.verdict];
+  verdictEl.className = `verdict-banner ${vc.cls}`;
+  verdictEl.innerHTML = `
+    <div class="verdict-label" style="color:${vc.color}">✦ ${vc.label}</div>
+    <div class="verdict-title" style="color:${vc.color}">${vc.title}</div>
+    <div class="verdict-sub">${vc.sub}</div>
+    <div class="verdict-score-badge">${scores.cloudScore > scores.localScore ? scores.cloudScore : scores.localScore}%</div>
+  `;
+
+  // Feasibility cards
+  const feasEl = document.getElementById('feasibility-row');
+  const fItems = [
+    { label: 'Technical', score: scores.technical, desc: 'Connectivity & infrastructure readiness' },
+    { label: 'Financial', score: scores.financial, desc: 'Budget alignment with deployment model' },
+    { label: 'Operational', score: scores.operational, desc: 'IT capacity & maintenance capability' },
+  ];
+  feasEl.innerHTML = fItems.map(f => {
+    const color = f.score >= 70 ? '#b5e853' : f.score >= 45 ? '#e8a953' : '#e85353';
+    const grade = f.score >= 70 ? 'High' : f.score >= 45 ? 'Medium' : 'Low';
+    const r = 38, circ = 2 * Math.PI * r;
+    const dash = (f.score / 100) * circ;
+    return `
+      <div class="feasibility-card">
+        <div class="feasibility-type">${f.label} Feasibility</div>
+        <div class="score-ring-wrap">
+          <div class="score-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="${r}" fill="none" stroke="#2a2a2a" stroke-width="8"/>
+              <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="8"
+                stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"/>
+            </svg>
+            <div class="score-ring-text" style="color:${color}">${f.score}</div>
+          </div>
+        </div>
+        <div class="feasibility-score" style="display:none">${f.score}</div>
+        <div class="feasibility-label">${grade} · ${f.desc}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Comparison grid
+  const d2 = d;
+  const upStr = d2.uptime >= 85 ? '<span class="tag tag-good">Optimal</span>' : d2.uptime >= 70 ? '<span class="tag tag-warn">Marginal</span>' : '<span class="tag tag-bad">Risk</span>';
+  const localItStr = d2.itDept >= 3 ? '<span class="tag tag-good">Sufficient</span>' : '<span class="tag tag-warn">Stretched</span>';
+  const compareEl = document.getElementById('compare-grid');
+  const rows = [
+    ['Criteria', 'Cloud AIS', 'Local Server'],
+    ['Initial Cost', `<span class="compare-cloud">₱0 setup</span>`, `<span class="compare-local">${['₱200K', '₱400K', '₱1.2M', '₱3M', '₱6M+'][d.capex-1]} upfront</span>`],
+    ['Monthly Cost', `<span class="compare-cloud">${['₱5K', '₱25K', '₱60K', '₱120K', '₱200K'][d.opex-1]}/mo</span>`, `<span class="compare-local">₱10K–30K maintenance</span>`],
+    ['Internet Dependency', d.uptime >= 80 ? '<span class="tag tag-good">Manageable</span>' : '<span class="tag tag-bad">High Risk</span>', '<span class="tag tag-good">Low</span>'],
+    ['Data Control', `<span class="tag tag-warn">Vendor-hosted</span>`, `<span class="tag tag-good">Full control</span>`],
+    ['Scalability', `<span class="tag tag-good">On-demand</span>`, `<span class="tag tag-warn">Hardware-bound</span>`],
+    ['IT Requirement', `<span class="tag tag-good">Minimal in-house</span>`, localItStr],
+    ['RA 10173 Fit', d.raCompliance >= 4 ? '<span class="tag tag-warn">Requires DPA review</span>' : '<span class="tag tag-good">Compliant</span>', '<span class="tag tag-good">Easier compliance</span>'],
+    ['Uptime', upStr, d.power >= 3 ? '<span class="tag tag-good">UPS/Genset ready</span>' : '<span class="tag tag-warn">Power-dependent</span>'],
+    ['Disaster Recovery', '<span class="tag tag-good">Built-in backups</span>', d.serverHw >= 3 ? '<span class="tag tag-warn">Manual backups</span>' : '<span class="tag tag-bad">High risk</span>'],
+  ];
+
+  compareEl.innerHTML = rows.map((row, i) => {
+    const isHeader = i === 0;
+    const cls = isHeader ? 'compare-cell compare-header' : 'compare-cell';
+    return row.map((cell, ci) => {
+      let extra = '';
+      if (isHeader && ci === 1) extra = 'style="color:var(--cloud)"';
+      if (isHeader && ci === 2) extra = 'style="color:var(--local)"';
+      return `<div class="${cls}" ${extra}>${cell}</div>`;
+    }).join('');
+  }).join('');
+
+  // Risk grid
+  const riskEl = document.getElementById('risk-grid');
+  riskEl.innerHTML = risks.map(r => {
+    const cloudColor = r.cloud >= 60 ? '#e85353' : r.cloud >= 40 ? '#e8a953' : '#b5e853';
+    const localColor = r.local >= 60 ? '#e85353' : r.local >= 40 ? '#e8a953' : '#b5e853';
+    return `
+      <div class="risk-card">
+        <div class="risk-header">
+          <span class="risk-name">${r.name}</span>
+        </div>
+        <div style="margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:0.75rem;color:var(--cloud)">☁ Cloud</span>
+            <span style="font-size:0.75rem;color:var(--cloud)">${r.cloud}%</span>
+          </div>
+          <div class="risk-bar-wrap"><div class="risk-bar" style="width:${r.cloud}%;background:${cloudColor}"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:0.75rem;color:var(--local)">⬛ Local</span>
+            <span style="font-size:0.75rem;color:var(--local)">${r.local}%</span>
+          </div>
+          <div class="risk-bar-wrap"><div class="risk-bar" style="width:${r.local}%;background:${localColor}"></div></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Chart
+  if (costChartInstance) costChartInstance.destroy();
+  const ctx = document.getElementById('costChart').getContext('2d');
+  costChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+      datasets: [
+        {
+          label: 'Cloud AIS (Cumulative)',
+          data: costs.cloudCumulative,
+          borderColor: '#53b8e8',
+          backgroundColor: 'rgba(83,184,232,0.08)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 5,
+          pointBackgroundColor: '#53b8e8',
+        },
+        {
+          label: 'Local Server (Cumulative)',
+          data: costs.localCumulative,
+          borderColor: '#b5e853',
+          backgroundColor: 'rgba(181,232,83,0.06)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 5,
+          pointBackgroundColor: '#b5e853',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          labels: { color: '#888', font: { family: 'DM Sans', size: 12 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => '₱' + ctx.raw.toLocaleString()
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#666' }, grid: { color: '#1e1e1e' } },
+        y: {
+          ticks: {
+            color: '#666',
+            callback: v => '₱' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : (v/1000).toFixed(0)+'K')
+          },
+          grid: { color: '#1e1e1e' }
+        }
+      }
+    }
+  });
+
+  // Recommendation notes
+  const notesEl = document.getElementById('rec-notes');
+  const recText = {
+    cloud: [
+      '✓ Your internet connectivity ('+d.uptime+'% uptime) is adequate for cloud operations',
+      '✓ Cloud reduces IT burden — important given your '+['no dedicated IT','1–2 IT staff','3–5 IT staff','full IT dept'][d.itDept-1]+' capacity',
+      '✓ Subscription model aligns with your budget review cycle',
+      '⚠ Ensure your cloud vendor has a Philippine DPA-compliant Data Processing Agreement',
+      '⚠ Negotiate SLA with minimum 99.5% uptime guarantees and local data residency if required',
+    ],
+    local: [
+      '✓ Strong data governance priority ('+d.dataGov+'/5) is well-served by on-premise deployment',
+      '✓ Existing server hardware (rated: '+['none','outdated','partial','modern'][d.serverHw-1]+') reduces initial CAPEX',
+      '✓ Independence from internet connectivity mitigates your uptime risk ('+d.uptime+'%)',
+      '⚠ Invest in UPS/generator backup given power reliability rating of '+['frequent outages','occasional outages','rare outages','stable'][d.power-1],
+      '⚠ Establish automated off-site backup procedures to address disaster recovery risk',
+    ],
+    hybrid: [
+      '✓ Core student records remain on-premise, satisfying RA 10173 compliance',
+      '✓ Cloud component provides remote access for faculty and administrators',
+      '⚠ Requires careful data segregation policy — determine which modules are cloud-eligible',
+      '⚠ Additional IT complexity; ensure IT team is trained on both environments',
+      '⚠ Budget for both CAPEX (local) and ongoing OPEX (cloud) components',
+    ],
+  };
+  notesEl.innerHTML = `
+    <div class="card-title">Key Recommendations for ${d.name}</div>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+      ${recText[scores.verdict].map(r => `<div style="font-size:0.85rem;line-height:1.5;color:${r.startsWith('⚠') ? '#e8a953' : '#b5e853'}">${r}</div>`).join('')}
+    </div>
+  `;
+
+  goTo(5);
+}
+
+// ===================== PDF EXPORT =====================
+async function exportPDF() {
+  const loading = document.getElementById('pdf-loading');
+  loading.classList.add('show');
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297, margin = 16;
+    const contentW = pageW - margin * 2;
+
+    const d = getInputs();
+    const scores = computeScores(d);
+    const risks = computeRisks(d);
+    const costs = computeCosts(d);
+    const now = new Date().toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+
+    const verdictConfig = {
+      cloud: { label: 'Cloud-Based AIS', color: [83,184,232] },
+      local: { label: 'Local Server AIS', color: [181,232,83] },
+      hybrid: { label: 'Hybrid Deployment', color: [232,169,83] },
+    };
+    const vc = verdictConfig[scores.verdict];
+
+    // ---- PAGE 1 ----
+    // Header bar
+    pdf.setFillColor(15,15,15);
+    pdf.rect(0, 0, 210, 297, 'F');
+    pdf.setFillColor(26,26,26);
+    pdf.rect(0, 0, 210, 28, 'F');
+    pdf.setTextColor(255,255,255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Academic Deployment Decision-Support System', margin, 12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(120,120,120);
+    pdf.text('AD-DSS Prototype v1.0  ·  University of San Jose-Recoletos  ·  Generated: ' + now, margin, 20);
+
+    let y = 38;
+
+    // Verdict block
+    pdf.setFillColor(30,30,30);
+    pdf.roundedRect(margin, y, contentW, 36, 3, 3, 'F');
+    pdf.setFillColor(...vc.color.map(c=>Math.round(c*0.3)));
+    pdf.roundedRect(margin, y, contentW, 36, 3, 3, 'F');
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(...vc.color);
+    pdf.text('✦ RECOMMENDED DEPLOYMENT', margin+8, y+10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(18);
+    pdf.setTextColor(...vc.color);
+    pdf.text(vc.label, margin+8, y+22);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(170,170,170);
+    pdf.text(`Suitability: Cloud ${scores.cloudScore}%  |  Local ${scores.localScore}%`, margin+8, y+31);
+
+    y += 46;
+
+    // Institution info
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(130,130,130);
+    pdf.text('INSTITUTION', margin, y);
+    y += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.setTextColor(240,240,240);
+    pdf.text(d.name, margin, y);
+    y += 10;
+
+    // Feasibility scores
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(130,130,130);
+    pdf.text('FEASIBILITY SCORES', margin, y);
+    y += 6;
+
+    const fItems = [
+      { label: 'Technical', score: scores.technical },
+      { label: 'Financial', score: scores.financial },
+      { label: 'Operational', score: scores.operational },
+    ];
+    const colW = contentW / 3;
+    fItems.forEach((f, i) => {
+      const x = margin + i * colW;
+      const color = f.score >= 70 ? [181,232,83] : f.score >= 45 ? [232,169,83] : [232,83,83];
+      pdf.setFillColor(30,30,30);
+      pdf.roundedRect(x, y, colW-4, 22, 2, 2, 'F');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(150,150,150);
+      pdf.text(f.label + ' Feasibility', x+5, y+8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.setTextColor(...color);
+      pdf.text(f.score.toString(), x+5, y+19);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...color.map(c=>Math.round(c*0.7)));
+      const grade = f.score >= 70 ? 'HIGH' : f.score >= 45 ? 'MEDIUM' : 'LOW';
+      pdf.text(grade, x+24, y+19);
+    });
+    y += 30;
+
+    // Comparison table
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(130,130,130);
+    pdf.text('DEPLOYMENT COMPARISON', margin, y);
+    y += 6;
+
+    const tableRows = [
+      ['Criteria', 'Cloud AIS', 'Local Server'],
+      ['Initial Cost', '₱0 setup', ['₱200K','₱400K','₱1.2M','₱3M','₱6M+'][d.capex-1]+' upfront'],
+      ['Monthly Cost', ['₱5K','₱25K','₱60K','₱120K','₱200K'][d.opex-1]+'/mo', '₱10K–30K maintenance'],
+      ['Internet Dependency', d.uptime >= 80 ? 'Manageable' : 'HIGH RISK', 'Low'],
+      ['Data Control', 'Vendor-hosted', 'Full control'],
+      ['Scalability', 'On-demand', 'Hardware-bound'],
+      ['IT Requirement', 'Minimal in-house', ['None','1–2 staff','3–5 staff','Full dept'][d.itDept-1]],
+      ['RA 10173 Fit', d.raCompliance >= 4 ? 'Requires DPA review' : 'Compliant', 'Easier compliance'],
+      ['Disaster Recovery', 'Built-in backups', d.serverHw >= 3 ? 'Manual backups' : 'High risk'],
+    ];
+
+    const colWidths = [55, (contentW-55)/2, (contentW-55)/2];
+    tableRows.forEach((row, ri) => {
+      const isHeader = ri === 0;
+      pdf.setFillColor(isHeader ? 25 : ri%2===0 ? 28 : 23, isHeader ? 25 : ri%2===0 ? 28 : 23, isHeader ? 25 : ri%2===0 ? 28 : 23);
+      pdf.rect(margin, y, contentW, 7, 'F');
+
+      row.forEach((cell, ci) => {
+        const x = margin + colWidths.slice(0,ci).reduce((a,b)=>a+b,0);
+        pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
+        pdf.setFontSize(7);
+        if (isHeader) pdf.setTextColor(150,150,150);
+        else if (ci === 0) pdf.setTextColor(190,190,190);
+        else if (ci === 1) pdf.setTextColor(83,184,232);
+        else pdf.setTextColor(181,232,83);
+        pdf.text(cell, x+3, y+5);
+      });
+      y += 7;
+    });
+    y += 8;
+
+    // Risk profile
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(130,130,130);
+    pdf.text('RISK ASSESSMENT PROFILE', margin, y);
+    y += 6;
+
+    risks.forEach((r, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = margin + col * (contentW/2 + 2);
+      const ry = y + row * 18;
+      if (col === 0 && i > 0) { /* skip */ }
+      pdf.setFillColor(28,28,28);
+      pdf.roundedRect(x, ry, contentW/2 - 2, 16, 2, 2, 'F');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(190,190,190);
+      pdf.text(r.name, x+4, ry+5);
+
+      // Cloud bar
+      const cloudColor = r.cloud >= 60 ? [232,83,83] : r.cloud >= 40 ? [232,169,83] : [181,232,83];
+      const localColor = r.local >= 60 ? [232,83,83] : r.local >= 40 ? [232,169,83] : [181,232,83];
+      const barW = (contentW/2 - 28);
+      pdf.setTextColor(83,184,232);
+      pdf.text('Cloud', x+4, ry+10);
+      pdf.setFillColor(40,40,40);
+      pdf.rect(x+18, ry+7.5, barW, 2.5, 'F');
+      pdf.setFillColor(...cloudColor);
+      pdf.rect(x+18, ry+7.5, barW * r.cloud/100, 2.5, 'F');
+      pdf.setTextColor(83,184,232);
+      pdf.text(r.cloud+'%', x+18+barW+2, ry+10);
+
+      pdf.setTextColor(181,232,83);
+      pdf.text('Local', x+4, ry+15);
+      pdf.setFillColor(40,40,40);
+      pdf.rect(x+18, ry+12.5, barW, 2.5, 'F');
+      pdf.setFillColor(...localColor);
+      pdf.rect(x+18, ry+12.5, barW * r.local/100, 2.5, 'F');
+      pdf.setTextColor(181,232,83);
+      pdf.text(r.local+'%', x+18+barW+2, ry+15);
+    });
+
+    y += Math.ceil(risks.length/2) * 18 + 8;
+
+    // 5-year cost table
+    if (y > 220) { pdf.addPage(); pdf.setFillColor(15,15,15); pdf.rect(0,0,210,297,'F'); y = 20; }
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(130,130,130);
+    pdf.text('5-YEAR TOTAL COST OF OWNERSHIP PROJECTION', margin, y);
+    y += 6;
+
+    const costRows = [
+      ['Year', 'Cloud Cumulative (₱)', 'Local Cumulative (₱)', 'Difference (₱)'],
+      ...costs.cloudCumulative.map((c,i) => [
+        'Year ' + (i+1),
+        '₱' + c.toLocaleString(),
+        '₱' + costs.localCumulative[i].toLocaleString(),
+        (costs.localCumulative[i] > c ? '+₱' : '-₱') + Math.abs(costs.localCumulative[i]-c).toLocaleString() + (costs.localCumulative[i] > c ? ' Cloud saves' : ' Local saves'),
+      ])
+    ];
+    const costColW = contentW / 4;
+    costRows.forEach((row, ri) => {
+      const isHeader = ri === 0;
+      pdf.setFillColor(isHeader ? 25 : ri%2===0 ? 28 : 23, isHeader ? 25 : ri%2===0 ? 28 : 23, isHeader ? 25 : ri%2===0 ? 28 : 23);
+      pdf.rect(margin, y, contentW, 7, 'F');
+      row.forEach((cell, ci) => {
+        const x = margin + ci * costColW;
+        pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
+        pdf.setFontSize(7);
+        pdf.setTextColor(isHeader ? 150 : ci===1 ? 83 : ci===2 ? 181 : 200, isHeader ? 150 : ci===1 ? 184 : ci===2 ? 232 : 200, isHeader ? 150 : ci===1 ? 232 : ci===2 ? 83 : 200);
+        pdf.text(cell, x+3, y+5);
+      });
+      y += 7;
+    });
+
+    y += 10;
+
+    // Recommendations
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(130,130,130);
+    pdf.text('KEY RECOMMENDATIONS', margin, y);
+    y += 7;
+
+    const recText = {
+      cloud: [
+        'Internet connectivity ('+d.uptime+'% uptime) is adequate for cloud operations.',
+        'Cloud reduces IT burden for your '+['no dedicated IT','1–2 IT staff','3–5 IT staff','full IT dept'][d.itDept-1]+' team capacity.',
+        'Ensure cloud vendor has a Philippine DPA-compliant Data Processing Agreement.',
+        'Negotiate SLA with minimum 99.5% uptime guarantees and local data residency.',
+        'Maintain offline backup procedures to mitigate internet dependency risk.',
+      ],
+      local: [
+        'Strong data governance priority ('+d.dataGov+'/5) well-served by on-premise deployment.',
+        'Existing server hardware reduces initial CAPEX investment.',
+        'Independence from internet mitigates uptime risk ('+d.uptime+'% current uptime).',
+        'Invest in UPS/generator backup for power reliability.',
+        'Establish automated off-site backup procedures for disaster recovery.',
+      ],
+      hybrid: [
+        'Core student records remain on-premise satisfying RA 10173 compliance.',
+        'Cloud component provides remote access for faculty and administrators.',
+        'Requires careful data segregation policy for cloud-eligible modules.',
+        'Ensure IT team is trained on managing both environments.',
+        'Budget for both CAPEX (local) and ongoing OPEX (cloud) components.',
+      ],
+    };
+
+    recText[scores.verdict].forEach(rec => {
+      pdf.setFillColor(24,24,24);
+      pdf.rect(margin, y, contentW, 8, 'F');
+      pdf.setFillColor(rec.includes('Invest') || rec.includes('Ensure') || rec.includes('Negotiate') || rec.includes('Maintain') || rec.includes('Establish') || rec.includes('Budget') || rec.includes('Requires') ? 232 : 181,
+                       rec.includes('Invest') || rec.includes('Ensure') || rec.includes('Negotiate') ? 169 : 232,
+                       rec.includes('Invest') || rec.includes('Ensure') || rec.includes('Negotiate') ? 83 : 83);
+      pdf.rect(margin, y, 2, 8, 'F');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(200,200,200);
+      pdf.text(rec, margin+6, y+5.5);
+      y += 9;
+    });
+
+    y += 8;
+
+    // Footer
+    pdf.setFillColor(20,20,20);
+    pdf.rect(0, 285, 210, 12, 'F');
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(90,90,90);
+    pdf.text('AD-DSS Prototype v1.0  ·  Academic Deployment Decision-Support System  ·  University of San Jose-Recoletos  ·  Generated '+now, margin, 292);
+    pdf.setTextColor(130,130,130);
+    pdf.text('Page 1 of 1', 194, 292, { align: 'right' });
+
+    const instName = d.name.replace(/[^a-zA-Z0-9\s]/g,'').replace(/\s+/g,'-').substring(0,30);
+    pdf.save(`AD-DSS-Report-${instName}-${new Date().toISOString().slice(0,10)}.pdf`);
+
+  } catch (err) {
+    console.error('PDF error:', err);
+    alert('PDF export failed: ' + err.message);
+  } finally {
+    loading.classList.remove('show');
+  }
+}
+</script>
+</body>
+</html>
