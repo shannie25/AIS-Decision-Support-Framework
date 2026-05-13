@@ -517,7 +517,7 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   </div>
 
   <div class="nav-bar">
-    <span class="step-info">Step 1 of 4</span>
+    <span class="step-info">Step 1 of 5</span>
     <div style="display:flex;gap:8px;align-items:center;">
       <div style="width:32px;height:3px;border-radius:2px;background:var(--accent)"></div>
       <div style="width:32px;height:3px;border-radius:2px;background:var(--border)"></div>
@@ -696,6 +696,7 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
       <input type="range" id="ra-compliance" min="1" max="5" value="4" step="1"
              oninput="document.getElementById('ra-val').textContent=this.value"/>
     </div>
+    <p class="field-hint" style="margin-top:10px;">Cloud deployments require a DPA-compliant Data Processing Agreement with your vendor. Local servers generally have an easier compliance path under RA 10173.</p>
   </div>
 
   <div class="card">
@@ -740,7 +741,7 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
     <!-- 5-YEAR COST CHART -->
     <div class="chart-wrap">
       <div class="chart-title">5-Year Total Cost of Ownership Projection</div>
-      <div class="chart-sub">Cumulative cost comparison: Cloud subscription vs. Local server (hardware + maintenance)</div>
+      <div class="chart-sub">Cumulative cost comparison: Cloud subscription vs. Local server (hardware + maintenance). Note: for institutions with stable, predictable workloads, cloud OPEX may eventually rival local costs over time.</div>
       <canvas id="costChart" class="chart-canvas"></canvas>
     </div>
 
@@ -805,6 +806,7 @@ function getInputs() {
     capex: parseInt(document.getElementById('capex').value),
     opex: parseInt(document.getElementById('opex').value),
     costModel: document.getElementById('cost-model').value,
+    budgetCycle: document.getElementById('budget-cycle').value,
     dataGov: parseInt(document.getElementById('data-gov').value),
     remoteAcc: parseInt(document.getElementById('remote-acc').value),
     raCompliance: parseInt(document.getElementById('ra-compliance').value),
@@ -822,17 +824,23 @@ function computeScores(d) {
   tech += (d.itDept / 4) * 15;
 
   // Financial Feasibility (0–100)
+  // Measures overall budget capacity — higher budget = more feasible regardless of model
   let fin = 0;
-  fin += (d.capex / 5) * 40;
-  fin += (d.opex / 5) * 40;
-  fin += d.costModel === 'subscription' ? 10 : d.costModel === 'either' ? 15 : 20;
+  fin += (d.capex / 5) * 40;  // max 40
+  fin += (d.opex / 5) * 40;   // max 40
+  // Cost model alignment: subscription = cloud-ready, onetime = local-ready, either = most flexible
+  fin += d.costModel === 'either' ? 20 : d.costModel === 'subscription' ? 15 : 10; // max 20
 
   // Operational Feasibility (0–100)
   let ops = 0;
-  ops += (d.itDept / 4) * 30;
-  ops += (d.power / 4) * 25;
-  ops += (d.serverHw / 4) * 25;
-  ops += ((d.studentPop <= 2 ? 1 : d.studentPop <= 3 ? 0.6 : 0.3)) * 20;
+  ops += (d.itDept / 4) * 25;
+  ops += (d.power / 4) * 20;
+  ops += (d.serverHw / 4) * 20;
+  ops += ((d.studentPop <= 2 ? 1 : d.studentPop <= 3 ? 0.6 : 0.3)) * 15;
+  // Faculty/staff scale: more staff = more operational complexity
+  ops += (d.faculty <= 2 ? 1 : d.faculty <= 3 ? 0.7 : 0.4) * 10;
+  // Public/SUC institutions often have stricter procurement constraints
+  ops += d.instType === 'public' ? 5 : d.instType === 'technical' ? 8 : 10;
 
   // Cloud Suitability Score (higher = cloud better)
   let cloudScore = 0;
@@ -843,6 +851,10 @@ function computeScores(d) {
   cloudScore += d.opex >= 3 ? 10 : 5;
   cloudScore += d.costModel === 'subscription' ? 10 : 5;
   cloudScore += d.itDept <= 2 ? 10 : 5;
+  // Private/tech schools adapt to cloud faster; public SUCs face procurement constraints
+  cloudScore += d.instType === 'private' ? 8 : d.instType === 'technical' ? 6 : 2;
+  // Larger faculty = more need for remote access → favors cloud
+  cloudScore += d.faculty >= 3 ? 5 : 2;
 
   // Local Suitability Score (higher = local better)
   let localScore = 0;
@@ -853,6 +865,10 @@ function computeScores(d) {
   localScore += d.capex >= 3 ? 15 : 5;
   localScore += d.costModel === 'onetime' ? 10 : 5;
   localScore += d.uptime < 75 ? 10 : 0;
+  // Ad-hoc/project budgets suit one-time CAPEX; annual recurring suits cloud OPEX
+  localScore += d.budgetCycle === 'adhoc' ? 8 : d.budgetCycle === 'quarterly' ? 4 : 2;
+  // Public/SUC favors local (COA audit trail, procurement rules)
+  localScore += d.instType === 'public' ? 8 : d.instType === 'technical' ? 4 : 0;
 
   // Normalize
   const total = cloudScore + localScore;
@@ -872,9 +888,11 @@ function computeScores(d) {
 function computeRisks(d) {
   return [
     {
+      // Per Hashizume et al. (2013): cloud introduces shared-infrastructure breach risks
+      // regardless of institutional preference; local risk depends on internal controls
       name: 'Data Breach Risk',
-      cloud: d.dataGov >= 4 ? 65 : d.dataGov >= 2 ? 45 : 30,
-      local: d.raCompliance >= 4 ? 25 : 45,
+      cloud: d.raCompliance >= 4 ? 60 : 45, // cloud always elevated; stricter compliance = higher concern
+      local: d.raCompliance >= 4 ? 20 : 40, // local easier to comply (RA 10173 per paper)
     },
     {
       name: 'Downtime Risk',
@@ -887,14 +905,17 @@ function computeRisks(d) {
       local: 15,
     },
     {
+      // Per Carideo et al. (2013) & Mateen et al. (2021): vendor lock-in is a structural
+      // cloud risk; subscription deepens it but it exists regardless of cost model
       name: 'Vendor Lock-in',
-      cloud: d.costModel === 'subscription' ? 70 : 50,
-      local: 20,
+      cloud: d.costModel === 'subscription' ? 75 : 60,
+      local: 15,
     },
     {
+      // Cloud DR is built-in but useless without internet; local DR is manual but always accessible
       name: 'Disaster Recovery',
-      cloud: 20,
-      local: d.serverHw >= 3 ? 40 : 70,
+      cloud: d.uptime < 75 ? 45 : d.uptime < 90 ? 25 : 15,
+      local: d.serverHw >= 3 ? 35 : 65,
     },
   ];
 }
@@ -913,7 +934,7 @@ function computeCosts(d) {
   const cloudCumulative = years.map(y => cloudYearly * y);
   const localCumulative = years.map(y => {
     let cost = localCapex + localMaintenance * y;
-    if (y >= 3) cost += localHwReplacement * (y - 2) * 0.3;
+    if (y >= 3) cost += localHwReplacement; // one-time hardware refresh at year 3
     return Math.round(cost);
   });
 
@@ -1419,7 +1440,7 @@ async function exportPDF() {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(6.5);
     pdf.setTextColor(90,90,90);
-    pdf.text('AD-DSS Prototype v1.0  ·  Academic Deployment Decision-Support System  ·  University of San Jose-Recoletos  ·  Generated '+now, margin, 292);
+    pdf.text('AD-DSS Prototype v1.0  ·  Based on: Mamitag, Arnado & Magsayo (2026) — Technology Feasibility & Risk Analysis, USJ-R  ·  Generated '+now, margin, 292);
     pdf.setTextColor(130,130,130);
     pdf.text('Page 1 of 1', 194, 292, { align: 'right' });
 
